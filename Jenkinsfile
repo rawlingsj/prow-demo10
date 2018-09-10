@@ -16,23 +16,34 @@ pipeline {
           HELM_RELEASE = "$PREVIEW_NAMESPACE".toLowerCase()
         }
         steps {
-          sh "mvn versions:set -DnewVersion=$PREVIEW_VERSION"
-          sh "mvn install"
-          sh 'export VERSION=$PREVIEW_VERSION && skaffold build -f skaffold.yaml'
-          sh "jx step post build --image $DOCKER_REGISTRY/$ORG/$APP_NAME:$PREVIEW_VERSION"
+          // container('maven') {
+            sh "mvn versions:set -DnewVersion=$PREVIEW_VERSION"
+            sh "mvn install"
+            sh 'export VERSION=$PREVIEW_VERSION && skaffold build -f skaffold.yaml'
+
+
+            sh "jx step post build --image $DOCKER_REGISTRY/$ORG/$APP_NAME:$PREVIEW_VERSION"
+          // }
 
           dir ('./charts/preview') {
+          //  container('maven') {
              sh "make preview"
+             sh "env | sort"
+             sh "pwd"
+             //input 'ok'
+             sh "cat requirements.yaml"
+             sh "ls -al"
              sh "jx preview --app $APP_NAME --dir ../.. -b"
+           }
           }
-        }
+        // }
       }
       stage('Build Release') {
         when {
           branch 'master'
         }
         steps {
-
+          // container('maven') {
             // ensure we're not on a detached head
             sh "git checkout master"
             sh "git config --global credential.helper store"
@@ -41,20 +52,20 @@ pipeline {
             // so we can retrieve the version in later steps
             sh "echo \$(jx-release-version) > VERSION"
             sh "mvn versions:set -DnewVersion=\$(cat VERSION)"
-
+          // }
           dir ('./charts/prow-demo10') {
-
+            // container('maven') {
               sh "make tag"
-
+            // }
           }
-
+          container('maven') {
             sh 'mvn clean deploy'
 
             sh 'export VERSION=`cat VERSION` && skaffold build -f skaffold.yaml'
 
 
             sh "jx step post build --image $DOCKER_REGISTRY/$ORG/$APP_NAME:\$(cat VERSION)"
-
+          }
         }
       }
       stage('Promote to Environments') {
@@ -63,7 +74,7 @@ pipeline {
         }
         steps {
           dir ('./charts/prow-demo10') {
-
+            // container('maven') {
               sh 'jx step changelog --version v\$(cat ../../VERSION)'
 
               // release the helm chart
@@ -71,17 +82,9 @@ pipeline {
 
               // promote through all 'Auto' promotion Environments
               sh 'jx promote -b --all-auto --timeout 1h --version \$(cat ../../VERSION)'
-
-          }
+            }
+          // }
         }
       }
     }
-    post {
-        failure {
-            input """Pipeline failed. 
-We will keep the build pod around to help you diagnose any failures. 
-
-Select Proceed or Abort to terminate the build pod"""
-        }
-    }
-}
+  }
