@@ -83,9 +83,6 @@ pipeline {
       }
     }
     post {
-        always {
-            cleanWs()
-        }
         failure {
             input """Pipeline failed. 
 We will keep the build pod around to help you diagnose any failures. 
