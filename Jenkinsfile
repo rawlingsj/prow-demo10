@@ -25,6 +25,9 @@ pipeline {
 
           dir ('./charts/preview') {
              sh "make preview"
+             sh "git config --global credential.helper store"
+
+             sh "jx step git credentials"
              sh "jx preview --app $APP_NAME --dir ../.. -b"
            }
           }
